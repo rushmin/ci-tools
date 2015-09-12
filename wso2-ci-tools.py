@@ -1,52 +1,59 @@
-from subprocess import call
 import os
+import time
+from subprocess import call
+import requests
+import json
 
-# Merges remote branches in to local given repos.
 class GitEngine:
 
-    def __init__(self, repoInfo, mergeInfo):
-        self.repoInfo = repoInfo
-        self.mergeInfo = mergeInfo
+    def __init__(self, repos, conf):
+        self.repos = repos
+        self.conf = conf
 
-    def merge(self, repoName):
-        repoLocation = self.repoInfo[repoName]["location"];
-        mergeBaseBranch = self.repoInfo[repoName]["branch"];
+    def mergePullRequest(self, pullRequestInfo):
 
-        remoteName = self.mergeInfo[repoName]["remote"]
-        mergeTargetBranch = self.mergeInfo[repoName]["branch"]
+        repoName = pullRequestInfo['repo']
+        repoLocation = self.repos[repoName]['cloneLocation']
+        repoOwner = self.repos[repoName]['github']['owner']
+        pullRequestId = pullRequestInfo['id']
 
-        print "Processing git repo : ", repoLocation
+        print "Merging pull requeust. repo : '{}', clone : '{}', repo-owner : '{}', pull-request-id : '{}'".format(repoName, repoLocation, repoOwner, pullRequestId)
 
         os.chdir(repoLocation)
+        print "Switched to git repo '{}'".format(repoLocation)
 
-        # Fetch the origin
-        self.git("fetch", ['origin'])
+        # Fetch pull request info from github
+        pullRequestInfoApiUrl = self.conf['github']['api']['root'] + self.conf['github']['api']['getPullRequest'].format(repoOwner, repoName, pullRequestId)
+        response =  self.invokeGitHubApi(pullRequestInfoApiUrl)
+        pullRequestInfo = response.json();
 
-        # Checkout the merge base
-        self.git("checkout", [mergeBaseBranch])
+        # Fetch from the origin
+        self.git('fetch')
 
-        # Pull the remote changes
-        self.git("pull")
+        # Checkout the base branch
+        baseBranch = pullRequestInfo['base']['ref']
+        self.git('checkout', [baseBranch])
 
-        # Fetch the remote
-        self.git("fetch", [remoteName])
+        # Pull changes from the origin
+        self.git('pull')
 
-        # Merge the remote target branch
-        mergeArgs = ['--no-ff']
+        # Checkout a new branch for the merge
+        pullRequestCreator = pullRequestInfo['user']['login']
+        pullRequestBranch = pullRequestInfo['head']['ref']
+        tempBranchName = 'PR/' + '-'.join([pullRequestCreator, pullRequestBranch, pullRequestId])
+        self.git('checkout', ['-b', tempBranchName])
 
-        pullRequestId = self.mergeInfo[repoName]["pullRequestId"]
+        # Pull the changes from the pull request
+        pullRequestRepoUrl = pullRequestInfo['head']['repo']['git_url']
+        self.git('pull', [pullRequestRepoUrl, pullRequestBranch])
 
-        if pullRequestId is None:
-            mergeArgs.append('--no-edit')
-        else:
-            mergeArgs.append('-m')
-            mergeArgs.append('"Merge pull request #' + pullRequestId + ' from ' + remoteName + '/' + mergeTargetBranch + '"')
+        # Merge the pull request
+        mergeMessage = 'Merge pull request #{} from {}/{}'.format(pullRequestId, pullRequestCreator, pullRequestBranch)
+        self.git('checkout', [baseBranch])
+        self.git('merge', ['--no-ff', '-m', mergeMessage, tempBranchName])
 
-        mergeArgs.append(remoteName + "/" + mergeTargetBranch)
-
-        self.git("merge", mergeArgs)
-
-        self.git("push", ['origin', mergeBaseBranch])
+        # Push the changes
+        self.git('push', ['origin', baseBranch])
 
     def git(self, command, arguments=[]):
 
@@ -56,18 +63,28 @@ class GitEngine:
         for argument in arguments:
             gitCommand.append(argument)
 
-        print "\nGitCommand :: ", " ".join(gitCommand)
+        print '\nGitCommand :: ', ' '.join(gitCommand)
 
         exitCode = call(gitCommand)
 
         if exitCode == 1:
-            print "GIT ERROR : Cannot proceed."
+            print 'GIT ERROR : Cannot proceed.'
             exit(1)
 
-repoInfo = {'carbon-appmgt':{'name':'carbon-appmgt', 'branch':'support', 'location':'/wso2dev/rnd/poc/wso2-ci-tools/builder/carbon-appmgt'}}
-mergeInfo = {'carbon-appmgt':{'remote':'john', 'branch':'fix2', 'pullRequestId':'2'}}
+    def invokeGitHubApi(self, url, params={}):
+
+        username = self.conf['github']['username']
+        password = self.conf['github']['password']
+
+        print "Invoking GitHub API '{}'".format(url)
+        response = requests.get(url, auth=(username, password))
+        return response
 
 
-gitEngine = GitEngine(repoInfo, mergeInfo);
+data = json.loads(open(os.getcwd()+'/ci-tools-data.json').read())
+repos = data['repositories']
+conf = data['conf']
+gitEngine = GitEngine(repos, conf);
 
-gitEngine.merge('carbon-appmgt');
+pullRequest = {'repo':'ci-tools-test', 'id':'1'}
+gitEngine.mergePullRequest(pullRequest);

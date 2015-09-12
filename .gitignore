@@ -55,3 +55,6 @@ docs/_build/
 
 # PyBuilder
 target/
+
+#ci-tools user data files
+ci-tools-data.json
