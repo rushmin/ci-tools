@@ -1,6 +1,8 @@
 import os
+import sys
 import time
 from subprocess import call
+import argparse
 import requests
 import json
 
@@ -10,8 +12,9 @@ class GitEngine:
         self.repos = repos
         self.conf = conf
 
-    def mergePullRequest(self, pullRequestInfo):
+    def mergePullRequest(self, pullRequestInfo, shouldPush):
 
+        print pullRequestInfo
         repoName = pullRequestInfo['repo']
         repoLocation = self.repos[repoName]['cloneLocation']
         repoOwner = self.repos[repoName]['github']['owner']
@@ -53,7 +56,8 @@ class GitEngine:
         self.git('merge', ['--no-ff', '-m', mergeMessage, tempBranchName])
 
         # Push the changes
-        self.git('push', ['origin', baseBranch])
+        if shouldPush:
+            self.git('push', ['origin', baseBranch])
 
     def git(self, command, arguments=[]):
 
@@ -80,11 +84,25 @@ class GitEngine:
         response = requests.get(url, auth=(username, password))
         return response
 
+def main(argv):
 
-data = json.loads(open(os.getcwd()+'/ci-tools-data.json').read())
-repos = data['repositories']
-conf = data['conf']
-gitEngine = GitEngine(repos, conf);
+    parser = argparse.ArgumentParser(description='CI Tools.')
 
-pullRequest = {'repo':'ci-tools-test', 'id':'1'}
-gitEngine.mergePullRequest(pullRequest);
+    subparsers = parser.add_subparsers()
+
+    mergePullRequest = subparsers.add_parser('mergePullRequest')
+    mergePullRequest.add_argument("pullRequest", help="Sample pull request => {'repo':'ci-tools', 'id':'1'}")
+    mergePullRequest.add_argument("--push", action="store_true", help="Flag to push the merge to the origin")
+
+    args = parser.parse_args()
+
+    data = json.loads(open(os.getcwd()+'/ci-tools-data.json').read())
+    repos = data['repositories']
+    conf = data['conf']
+    gitEngine = GitEngine(repos, conf);
+
+    if args.pullRequest is not None:
+        gitEngine.mergePullRequest(eval(args.pullRequest), args.push);
+
+if __name__ == "__main__":
+   main(sys.argv[1:])
