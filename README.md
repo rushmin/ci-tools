@@ -9,7 +9,7 @@ Some CI extensions for Git and Maven
 ci-tools.py mergePullRequest "{'repo':'ci-tools-test', 'id':'1'}" --push
 ```
 
-A data file which contains the repo information should be there in the current directly. The name of the file should be **ci-tools-data.json**
+A data file which contains the repo information should be there in the current directory. The name of the file should be **ci-tools-data.json**
 
 #####Sample file
 
