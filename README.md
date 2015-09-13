@@ -34,7 +34,7 @@ optional arguments:
 
 ci-tools needs a settings file which contains settings to access git providers like GitHub. (See the sample settings file below)
 
-**NOTE : ** You only have to change the username and password in this setting file, unless the git providers has changed their HTTP resource URLs.
+**NOTE :** You only have to change the username and password in this setting file, unless the git providers has changed their HTTP resource URLs.
 
 
 The settings file can be specified using the **_--settings_** argument.
