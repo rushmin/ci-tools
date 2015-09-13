@@ -9,16 +9,25 @@ Python 2.7.5+
 ####Usage
 
 ```
-ci-tools.py [-h] [--settings SETTINGS] mergePullRequest [-h] [--push] pullRequest
+ci-tools.py [-h] [--settings SETTINGS] merge [-h] [-c CLONE_LOCATION] [-d] [--push] pullRequestUrl
 
-positional arguments:
-
-  pullRequest  e.g. => "{'repoLocation':'ci-tools-test','pullRequestUrl':'https://github.com/john/ci-tools-test/pull/1'}"
+required arguments:
+  pullRequestUrl
+    URL of the pull request. e.g. https://github.com/john/ci-tools-test/pull/2
 
 optional arguments:
-  -h, --help   show the message and exit
-  --settings   settings file location
-  --push       flag to push the merge to the origin
+  -h, --help
+    show the help message and exit
+
+  -c CLONE_LOCATION, --clone-location CLONE_LOCATION  
+    clone location of the base repo
+
+  -d, --delete-merge-branch
+    delete the temporary merge branch
+
+  --push
+    push the merge to the origin
+
 ```
 
 ####Settings

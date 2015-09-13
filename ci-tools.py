@@ -14,16 +14,15 @@ class GitEngine:
     def __init__(self, settings):
         self.settings = settings
 
-    def mergePullRequest(self, pullRequestInfo, shouldPush):
+    def mergePullRequest(self, cloneLocation, pullRequestUrl, shouldDeleteMergeBranch, shouldPush):
 
-        localRepoLocation = pullRequestInfo['repoLocation']
-        pullRequestUrl = pullRequestInfo['pullRequestUrl']
+        print '\n== Pull request merge =='
 
-        print "\nProcessing pull request '{}' on '{}'".format(pullRequestUrl, localRepoLocation)
+        # Change the directory to clone location
+        os.chdir(cloneLocation)
+        print "\nSwitched to the clone location '{}'".format(os.getcwd())
 
-        # Change the directory to the repo location
-        os.chdir(localRepoLocation)
-        print "\nSwitched to git repo '{}'".format(os.getcwd())
+        print "\nProcessing pull request '{}' on '{}'".format(pullRequestUrl, os.getcwd())
 
         # Parse the pull request url to get the repo info and the pull request id.
         parsedPullRequest = self.parsePullRequestUrl(pullRequestUrl)
@@ -37,12 +36,14 @@ class GitEngine:
         pullRequestInfo = response.json();
 
         if self.shouldContinue(pullRequestInfo) is False:
+            print '\nBye\n'
             exit()
 
         validationResult = self.validatePullRequest(pullRequestInfo)
 
         if validationResult['status'] is False:
-            print '\nError : Cannot merge the pull requet. Reason : ' + validationResult['reason']
+            print '\nError : Cannot merge the pull requet. Reason : {}  \n'.format(validationResult['reason'])
+            exit(101)
 
         print "\nMerging pull requeust. repo : '{}', repo-owner : '{}', pull-request-id : '{}'".format(repoName, repoOwner, pullRequestId)
 
@@ -74,6 +75,13 @@ class GitEngine:
         # Push the changes
         if shouldPush:
             self.git('push', ['origin', baseBranch])
+
+        # Delet the temporary merge branch
+        if shouldDeleteMergeBranch:
+            self.git('branch', ['-d', tempBranchName])
+
+        print '\nOK. Pull request merge was successful.\n'
+
 
     def shouldContinue(self, pullRequestInfo):
 
@@ -114,9 +122,9 @@ class GitEngine:
 
         exitCode = call(gitCommand)
 
-        if exitCode == 1:
-            print 'GIT ERROR : Cannot proceed.'
-            exit(1)
+        if exitCode is not 0:
+            print '\nGIT ERROR : Cannot proceed. Exiting ...\n'
+            exit(102)
 
     def invokeGitHubApi(self, url, params={}):
 
@@ -149,18 +157,27 @@ def main(argv):
 
     subparsers = parser.add_subparsers()
 
-    mergePullRequest = subparsers.add_parser('mergePullRequest')
-    mergePullRequest.add_argument('pullRequest', help="e.g. => {'repoLocation':'ci-tools-test', 'pullRequestUrl':'https://github.com/john/ci-tools-test/pull/1'}")
+    mergePullRequest = subparsers.add_parser('merge')
+    mergePullRequest.add_argument('-c', '--clone-location', help='Clone location of the base repo')
+    mergePullRequest.add_argument('pullRequestUrl', help='URL of the pull request. e.g. https://github.com/john/ci-tools-test/pull/2')
+    mergePullRequest.add_argument('-d', '--delete-merge-branch', action='store_true', help='Delete the temporary merge branch')
     mergePullRequest.add_argument('--push', action='store_true', help='Flag to push the merge to the origin')
 
     args = parser.parse_args()
 
+    # Load settings
     settings = loadSettings(args.settings)
 
+    # Init the git engine
     gitEngine = GitEngine(settings);
 
-    if args.pullRequest is not None:
-        gitEngine.mergePullRequest(eval(args.pullRequest), args.push);
+    # Read the clone location. Use the currently directory, if not specified.
+    cloneLocation = os.getcwd()
+    if args.clone_location is not None:
+        cloneLocation = args.clone_location
+
+    # Read the pull request URL
+    gitEngine.mergePullRequest(cloneLocation, args.pullRequestUrl, args.delete_merge_branch, args.push);
 
 def loadSettings(location):
 
