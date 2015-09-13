@@ -1,7 +1,7 @@
 # ci-tools
 
 ####What ?
-Some CI extensions for Git and Maven. Only supports merging GitHub pull requests as of now.
+Some CI utils for Git and Maven. Only supports merging GitHub pull requests as of now.
 
 ####Requirements
 Python 2.7.5+
