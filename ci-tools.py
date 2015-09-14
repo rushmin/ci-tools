@@ -3,7 +3,7 @@
 import os
 import sys
 import time
-from subprocess import call
+from subprocess import call, PIPE, Popen, STDOUT
 import argparse
 import requests
 import json
@@ -54,18 +54,21 @@ class GitEngine:
         baseBranch = pullRequestInfo['base']['ref']
         self.git('checkout', [baseBranch])
 
+        # Print the git status
+        self.git('status')
+
         # Pull changes from the origin
         self.git('pull')
 
         # Checkout a new branch for the merge
         pullRequestCreator = pullRequestInfo['user']['login']
         pullRequestBranch = pullRequestInfo['head']['ref']
-        tempBranchName = 'PR/' + '-'.join([pullRequestCreator, pullRequestBranch, pullRequestId])
+        tempBranchName = 'PR/' + '-'.join([pullRequestId, pullRequestCreator, pullRequestBranch])
         self.git('checkout', ['-b', tempBranchName])
 
         # Pull the changes from the pull request
         pullRequestRepoUrl = pullRequestInfo['head']['repo']['clone_url']
-        self.git('pull', [pullRequestRepoUrl, pullRequestBranch])
+        self.git('pull', ['--no-edit', pullRequestRepoUrl, pullRequestBranch])
 
         # Merge the pull request
         mergeMessage = '"Merge pull request #{} from {}/{}"'.format(pullRequestId, pullRequestCreator, pullRequestBranch)
@@ -105,6 +108,20 @@ class GitEngine:
 
     def validatePullRequest(self, pullRequestInfo):
 
+        # Check whether the current directory is a git repo.
+        try:
+            shell('git status')
+        except SystemError:
+            return {'status':False, 'reason':"'{}' is not a git repository.".format(os.getcwd())}
+
+        # Compare the URL of the base repo and the origin URL of the clone
+        baseRepoUrl = pullRequestInfo['base']['repo']['html_url']
+        origin = self.gitConfig('.git/config', 'remote.origin.url')
+
+        if baseRepoUrl != origin:
+            return {'status':False, 'reason':"Clone origin ('{}') and the pull request base repo ('{}') are different".format(origin, baseRepoUrl)}
+
+        # Check whether the pull request is already merged
         if pullRequestInfo['merged'] is True:
             return {'status':False, 'reason':'Pull request is already merged.'}
 
@@ -125,6 +142,9 @@ class GitEngine:
         if exitCode is not 0:
             print '\nGIT ERROR : Cannot proceed. Exiting ...\n'
             exit(102)
+
+    def gitConfig(self, file, key):
+        return shell('git config --file {} {}'.format(file, key))
 
     def invokeGitHubApi(self, url, params={}):
 
@@ -161,7 +181,7 @@ def main(argv):
     mergePullRequest.add_argument('-c', '--clone-location', help='Clone location of the base repo')
     mergePullRequest.add_argument('pullRequestUrl', help='URL of the pull request. e.g. https://github.com/john/ci-tools-test/pull/2')
     mergePullRequest.add_argument('-d', '--delete-merge-branch', action='store_true', help='Delete the temporary merge branch')
-    mergePullRequest.add_argument('--push', action='store_true', help='Flag to push the merge to the origin')
+    mergePullRequest.add_argument('-p', '--push', action='store_true', help='Flag to push the merge to the origin')
 
     args = parser.parse_args()
 
@@ -190,6 +210,17 @@ def loadSettings(location):
             location = os.environ['HOME'] + '/.ci-tools'+ defaultSettingsFileName
 
     return json.loads(open(location).read())
+
+# --------- Util methods ---------
+
+def shell(command):
+    process = Popen(command, stdout=PIPE, stdin=PIPE, stderr=STDOUT, shell=True)
+    r = process.communicate()
+    if process.returncode != 0:
+        raise SystemError(r[0])
+    else:
+        # Remove line break
+        return "\n".join(r[0].splitlines())
 
 
 if __name__ == '__main__':
