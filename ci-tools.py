@@ -64,7 +64,7 @@ class GitEngine:
         self.git('checkout', ['-b', tempBranchName])
 
         # Pull the changes from the pull request
-        pullRequestRepoUrl = pullRequestInfo['head']['repo']['git_url']
+        pullRequestRepoUrl = pullRequestInfo['head']['repo']['clone_url']
         self.git('pull', [pullRequestRepoUrl, pullRequestBranch])
 
         # Merge the pull request
