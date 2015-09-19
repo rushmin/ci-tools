@@ -97,7 +97,7 @@ So make sure a settings file is located at least in of these locations.
 * Merge the pull request locally, using the following command
 
 ```
-ci-tools.py merge pr  https://github.com/john/ci-tools-test/pull/8
+python ci-tools.py merge pr  https://github.com/john/ci-tools-test/pull/8
 ```
 
 * Build the repo and test it.
@@ -107,13 +107,13 @@ ci-tools.py merge pr  https://github.com/john/ci-tools-test/pull/8
 If the merge should be pushed to the base repo right after the merge, the following command can be used. But this exactly what we do using the GitHub UI
 
 ```
-ci-tools.py merge pr --push https://github.com/john/ci-tools-test/pull/8
+python ci-tools.py merge pr --push https://github.com/john/ci-tools-test/pull/8
 ```
 
 #####Merging a pull request locally on to a branch other than the base branch of the pull request.
 
 ```
-ci-tools merge pr -b new-branch  https://github.com/john/ci-tools-test/pull/8
+python ci-tools.py merge pr -b new-branch  https://github.com/john/ci-tools-test/pull/8
 ```
 
 **NOTE** : If the target branch doesn't exist in the origin, **--no-update** switch should be used. This switch tells ci-tools not to pull the target branch from the origin.
@@ -121,7 +121,7 @@ ci-tools merge pr -b new-branch  https://github.com/john/ci-tools-test/pull/8
 #####Merging a pull request on to a local repo which is not a clone of the pull request base. e.g. a fork of the base
 
 ```
-ci-tools merge pr --no-strict-mode https://github.com/john/ci-tools-test/pull/8
+python ci-tools.py merge pr --no-strict-mode https://github.com/john/ci-tools-test/pull/8
 ```
 
 **--no-strict-mode** switch, disables the strict mode. This allows ci-tools to merge a pull request to a repo whose origin is not the base of the pull request.
