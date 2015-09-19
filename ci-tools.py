@@ -11,12 +11,13 @@ import re
 
 class GitEngine:
 
-    def __init__(self, settings):
+    def __init__(self, settings, isVerboseEnabled):
         self.settings = settings
+        self.isVerboseEnabled = isVerboseEnabled
 
-    def mergePullRequest(self, cloneLocation, pullRequestUrl, shouldDeleteMergeBranch, shouldPush):
+    def mergePullRequest(self, cloneLocation, pullRequestUrl, branch, shouldCleanup, isStrictMode, shouldUpdate, shouldPush):
 
-        print '\n== Pull request merge =='
+        print '\n== Pull request merge {} ==='.format('(Strict Mode)' if isStrictMode else '(Relaxed Mode)')
 
         # Change the directory to clone location
         os.chdir(cloneLocation)
@@ -33,13 +34,17 @@ class GitEngine:
         # Fetch pull request info from github
         pullRequestInfoApiUrl = self.settings['github']['api']['root'] + self.settings['github']['api']['urls']['getPullRequest'].format(repoOwner, repoName, pullRequestId)
         response =  self.invokeGitHubApi(pullRequestInfoApiUrl)
+
+        if self.isVerboseEnabled:
+            print '\n\tResponse Content\n\n<START>{}<END>'.format(response.text)
+
         pullRequestInfo = response.json();
 
         if self.shouldContinue(pullRequestInfo) is False:
             print '\nBye\n'
             exit()
 
-        validationResult = self.validatePullRequest(pullRequestInfo)
+        validationResult = self.validatePullRequest(pullRequestInfo, isStrictMode)
 
         if validationResult['status'] is False:
             print '\nError : Cannot merge the pull requet. Reason : {}  \n'.format(validationResult['reason'])
@@ -48,17 +53,24 @@ class GitEngine:
         print "\nMerging pull requeust. repo : '{}', repo-owner : '{}', pull-request-id : '{}'".format(repoName, repoOwner, pullRequestId)
 
         # Fetch from the origin
-        self.git('fetch')
+        if shouldUpdate:
+            self.git('fetch')
 
-        # Checkout the base branch
-        baseBranch = pullRequestInfo['base']['ref']
+        # Checkout the base branch.
+        # If a base branch is not explicitly specified, then the one in the pull request is used.
+        baseBranch = branch
+
+        if baseBranch is None:
+            baseBranch = pullRequestInfo['base']['ref']
+
         self.git('checkout', [baseBranch])
 
         # Print the git status
         self.git('status')
 
         # Pull changes from the origin
-        self.git('pull')
+        if shouldUpdate:
+            self.git('pull')
 
         # Checkout a new branch for the merge
         pullRequestCreator = pullRequestInfo['user']['login']
@@ -80,7 +92,7 @@ class GitEngine:
             self.git('push', ['origin', baseBranch])
 
         # Delet the temporary merge branch
-        if shouldDeleteMergeBranch:
+        if shouldCleanup:
             self.git('branch', ['-d', tempBranchName])
 
         print '\nOK. Pull request merge was successful.\n'
@@ -106,7 +118,7 @@ class GitEngine:
         else:
             return False
 
-    def validatePullRequest(self, pullRequestInfo):
+    def validatePullRequest(self, pullRequestInfo, isStrictMode):
 
         # Check whether the current directory is a git repo.
         try:
@@ -114,12 +126,13 @@ class GitEngine:
         except SystemError:
             return {'status':False, 'reason':"'{}' is not a git repository.".format(os.getcwd())}
 
-        # Compare the URL of the base repo and the origin URL of the clone
-        baseRepoUrl = pullRequestInfo['base']['repo']['html_url']
-        origin = self.gitConfig('.git/config', 'remote.origin.url')
+        # If 'strict' mode is enabled, compare the URL of the base repo and the origin URL of the clone
+        if isStrictMode:
+            baseRepoUrl = pullRequestInfo['base']['repo']['html_url']
+            origin = self.gitConfig('.git/config', 'remote.origin.url')
 
-        if baseRepoUrl != origin:
-            return {'status':False, 'reason':"Clone origin ('{}') and the pull request base repo ('{}') are different".format(origin, baseRepoUrl)}
+            if baseRepoUrl != origin:
+                return {'status':False, 'reason':"Clone origin ('{}') and the pull request base repo ('{}') are different".format(origin, baseRepoUrl)}
 
         # Check whether the pull request is already merged
         if pullRequestInfo['merged'] is True:
@@ -153,6 +166,11 @@ class GitEngine:
 
         print "\nInvoking GitHub API '{}'".format(url)
         response = requests.get(url, auth=(username, password))
+
+        if response.status_code is not requests.codes.ok:
+            print '\n\tError ! Status code : {}'.format(response.status_code)
+            exit()
+
         return response
 
     def parsePullRequestUrl(self, pullRequestUrl):
@@ -169,35 +187,77 @@ class GitEngine:
 
         return parsedPullRequest
 
+class CITools:
+
+    def __init__(self, settings, args):
+        self.settings = settings
+        self.args = args
+        self.isVerboseEnabled = args.isVerboseEnabled
+        self.gitEngine = GitEngine(settings, self.isVerboseEnabled);
+
+    def execute(self):
+
+        if self.args.command == 'pr':
+            self.handlePullRquestMerge()
+
+    def handlePullRquestMerge(self):
+
+        # Read the clone location. Use the currently directory, if not specified.
+        cloneLocation = os.getcwd()
+        if self.args.clone_location is not None:
+            cloneLocation = self.args.clone_location
+
+        # Read the pull request URL
+        self.gitEngine.mergePullRequest(cloneLocation,
+                                     self.args.pullRequestUrl,
+                                     self.args.branch,
+                                     self.args.shouldCleanup,
+                                     self.args.isStrictMode,
+                                     self.args.shouldUpdate,
+                                     self.args.shouldPush);
+
 
 def main(argv):
 
-    parser = argparse.ArgumentParser(description='CI Tools.')
-    parser.add_argument('--settings', help='Settings file location')
-
-    subparsers = parser.add_subparsers()
-
-    mergePullRequest = subparsers.add_parser('merge')
-    mergePullRequest.add_argument('-c', '--clone-location', help='Clone location of the base repo')
-    mergePullRequest.add_argument('pullRequestUrl', help='URL of the pull request. e.g. https://github.com/john/ci-tools-test/pull/2')
-    mergePullRequest.add_argument('-d', '--delete-merge-branch', action='store_true', help='Delete the temporary merge branch')
-    mergePullRequest.add_argument('-p', '--push', action='store_true', help='Flag to push the merge to the origin')
-
+    # Parse command line arguments
+    parser = getArgParser();
     args = parser.parse_args()
 
     # Load settings
     settings = loadSettings(args.settings)
 
-    # Init the git engine
-    gitEngine = GitEngine(settings);
+    # Execute the command
+    ciTools = CITools(settings, args)
+    ciTools.execute()
 
-    # Read the clone location. Use the currently directory, if not specified.
-    cloneLocation = os.getcwd()
-    if args.clone_location is not None:
-        cloneLocation = args.clone_location
 
-    # Read the pull request URL
-    gitEngine.mergePullRequest(cloneLocation, args.pullRequestUrl, args.delete_merge_branch, args.push);
+def getArgParser():
+
+    parser = argparse.ArgumentParser(description='CI Tools.')
+    parser.add_argument('--settings', help='settings file location')
+    parser.add_argument('-v', '--verbose', dest='isVerboseEnabled', action='store_true', help='enable verbose logging')
+
+    mergeCommandParser = parser.add_subparsers(dest='command').add_parser('merge', help='merge remote branches')
+
+    mergePullRequestCommandParser = mergeCommandParser.add_subparsers(dest='command').add_parser('pr', help='merge GitHub pull requests')
+
+    mergePullRequestCommandParser.add_argument('-c', '--clone-location', help='clone location of the base repo')
+    mergePullRequestCommandParser.add_argument('-b', '--branch', help='local base branch for the merge')
+
+    mergePullRequestCommandParser.add_argument('--no-cleanup', dest='shouldCleanup', action='store_false', help='do not clean up intermediate artifacts')
+    mergePullRequestCommandParser.set_defaults(shouldCleanup=True)
+
+    mergePullRequestCommandParser.add_argument('--no-strict-mode', dest='isStrictMode', action='store_false', help='switch off the strict mode')
+    mergePullRequestCommandParser.set_defaults(isStrictMode=True)
+
+    mergePullRequestCommandParser.add_argument('--no-update', dest='shouldUpdate', action='store_false', help='update the clone before the merge')
+    mergePullRequestCommandParser.set_defaults(shouldUpdate=True)
+
+    mergePullRequestCommandParser.add_argument('-p', '--push', dest='shouldPush', action='store_true', help='push the merge to the origin')
+
+    mergePullRequestCommandParser.add_argument('pullRequestUrl', help='URL of the pull request. e.g. https://github.com/john/ci-tools-test/pull/2')
+
+    return parser;
 
 def loadSettings(location):
 
