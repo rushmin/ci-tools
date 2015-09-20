@@ -11,7 +11,7 @@ Python 2.7.5+
 
 ####Installation
 
-#####1. Download the 'ci-tools.py' file from the latest release tag of the [GitHub repo](https://github.com/rushmin/ci-tools/releases).
+#####1. Get the 'ci-tools.py' file from the [latest release] (https://github.com/rushmin/ci-tools/releases/latest).
 
 #####2. Add an alias
 
