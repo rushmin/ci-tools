@@ -102,7 +102,7 @@ optional arguments:
 
 ####Recipes
 
-#####1.Testing and closing a pull request
+#####1. Testing and closing a pull request
 
 * Clone the base repo
 * Merge the pull request locally, using the following command
@@ -121,7 +121,7 @@ If the merge should be pushed to the base repo right after the merge, the follow
 ci-tools merge pr --push https://github.com/john/ci-tools-test/pull/8
 ```
 
-#####2.Merging a pull request locally on to a branch other than the base branch of the pull request.
+#####2. Merging a pull request locally on to a branch other than the base branch of the pull request.
 
 ```
 ci-tools merge pr -b new-branch  https://github.com/john/ci-tools-test/pull/8
@@ -129,7 +129,7 @@ ci-tools merge pr -b new-branch  https://github.com/john/ci-tools-test/pull/8
 
 **NOTE** : If the target branch doesn't exist in the origin, **--no-update** switch should be used. This switch tells ci-tools not to pull the target branch from the origin.
 
-#####3.Merging a pull request on to a local repo which is not a clone of the pull request base. e.g. a fork of the base
+#####3. Merging a pull request on to a local repo which is not a clone of the pull request base. e.g. a fork of the base
 
 ```
 ci-tools merge pr --no-strict-mode https://github.com/john/ci-tools-test/pull/8
