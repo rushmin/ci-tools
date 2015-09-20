@@ -38,7 +38,11 @@ class GitEngine:
         if self.isVerboseEnabled:
             print '\n\tResponse Content\n\n<START>{}<END>'.format(response.text)
 
-        pullRequestInfo = response.json();
+        try:
+            pullRequestInfo = response.json();
+        except ValueError:
+            print "\nError ! Can't parse API response. Use verbose mode to see more details.\n"
+            exit(105)
 
         if self.shouldContinue(pullRequestInfo) is False:
             print '\nBye\n'
@@ -47,10 +51,8 @@ class GitEngine:
         validationResult = self.validatePullRequest(pullRequestInfo, isStrictMode)
 
         if validationResult['status'] is False:
-            print '\nError : Cannot merge the pull requet. Reason : {}  \n'.format(validationResult['reason'])
+            print '\nError ! Cannot merge the pull requet. Reason : {}  \n'.format(validationResult['reason'])
             exit(101)
-
-        print "\nMerging pull requeust. repo : '{}', repo-owner : '{}', pull-request-id : '{}'".format(repoName, repoOwner, pullRequestId)
 
         # Fetch from the origin
         if shouldUpdate:
@@ -104,12 +106,15 @@ class GitEngine:
 
         baseRepo = pullRequestInfo['base']['repo']['full_name']
         baseBranch = pullRequestInfo['base']['ref']
-        creator = pullRequestInfo['user']['login']
+        creator = '{} ({})'.format(pullRequestInfo['user']['login'],pullRequestInfo['user']['html_url'])
         title = pullRequestInfo['title']
+        number = pullRequestInfo['number']
         updatedAt = pullRequestInfo['updated_at']
+        commits = pullRequestInfo['commits']
         pullRequestBranch = pullRequestInfo['head']['ref']
 
-        message = message + '\n\tbase-repo = {}\n\tbase-branch = {}\n\tcreator = {}\n\ttitle = {}\n\tupdated-at = {}\n\tpull-request-branch = {}\n\n ==>  [Yes/no] - '.format(baseRepo, baseBranch, creator, title, updatedAt, pullRequestBranch)
+        message = message + '\n\tbase-repo = {}\n\tbase-branch = {}\n\tcreator = {}\n\ttitle = {}\n\tnumber = {}\n\tupdated-at = {}\n\tcommits = {}\n\tpull-request-branch = {}\n\n ==>  [Yes/no] - '\
+                  .format(baseRepo, baseBranch, creator, title, number, updatedAt, commits, pullRequestBranch)
 
         response = raw_input(message);
 
@@ -136,7 +141,7 @@ class GitEngine:
 
         # Check whether the pull request is already merged
         if pullRequestInfo['merged'] is True:
-            return {'status':False, 'reason':'Pull request is already merged.'}
+            return {'status':False, 'reason':'Pull request has already been merged.'}
 
         return {'status':True, 'reason':''}
 
@@ -169,7 +174,7 @@ class GitEngine:
 
         if response.status_code is not requests.codes.ok:
             print '\n\tError ! Status code : {}'.format(response.status_code)
-            exit()
+            exit(104)
 
         return response
 
@@ -225,6 +230,9 @@ def main(argv):
 
     # Load settings
     settings = loadSettings(args.settings)
+    if settings is None:
+        print "\nError ! Can't read the settings file.\n"
+        exit(103)
 
     # Execute the command
     ciTools = CITools(settings, args)
@@ -261,15 +269,24 @@ def getArgParser():
 
 def loadSettings(location):
 
+    # Try the default settings file locations if the location is not specified.
     if location is None:
 
         defaultSettingsFileName = '/ci-tools-settings.json'
         if os.path.exists(os.getcwd() + defaultSettingsFileName):
             location = os.getcwd() + defaultSettingsFileName
-        else:
+        elif os.path.exists(os.environ['HOME'] + '/.ci-tools'+ defaultSettingsFileName):
             location = os.environ['HOME'] + '/.ci-tools'+ defaultSettingsFileName
 
-    return json.loads(open(location).read())
+    if location is not None:
+        try:
+            settings = json.loads(open(location).read())
+            return settings
+        except ValueError:
+            print "\nError ! {} is not a valid JSON file.".format(location)
+            return None
+    else:
+        return None
 
 # --------- Util methods ---------
 
