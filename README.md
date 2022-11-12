@@ -3,23 +3,23 @@
 #### What is 'ci-tools'?
 Some CI utils for Git and Maven. Only supports merging GitHub pull requests as of now.
 
-####Requirements
+#### Requirements
 Python 2.7.5+
 
 [Python-requests](http://www.python-requests.org/en/latest/user/install/#install)
 (In some environments this module is pre-installed)
 
-####Installation
+#### Installation
 
-#####1. Get the 'ci-tools.py' file from the [latest release] (https://github.com/rushmin/ci-tools/releases/latest).
+##### 1. Get the 'ci-tools.py' file from the [latest release] (https://github.com/rushmin/ci-tools/releases/latest).
 
-#####2. Add an alias
+##### 2. Add an alias
 
 ```
 alias ci-tools='python /path/to/ci-tools.py'
 ```
 
-#####3. Create the settings file
+##### 3. Create the settings file
 
 ci-tools needs a settings file which contains settings to access git providers like GitHub. (See the sample settings file below)
 
@@ -33,7 +33,7 @@ So make sure a settings file is located at least in of these locations.
 
 **NOTE :** You only have to change the username and the password in this settings file, unless the git providers has changed their HTTP resource URLs.
 
-#####Sample settings file
+##### Sample settings file
 
 ```json
 {
@@ -60,7 +60,7 @@ So make sure a settings file is located at least in of these locations.
 }
 ```
 
-####Usage
+#### Usage
 
 ```
 ci-tools.py [-h] [--settings SETTINGS] [-v] merge pr [-h] [-c CLONE_LOCATION] [-b BRANCH]
@@ -100,9 +100,9 @@ optional arguments:
 ```
 
 
-####Recipes
+#### Recipes
 
-#####1. Testing and closing a pull request
+##### 1. Testing and closing a pull request
 
 * Clone the base repo
 * Merge the pull request locally, using the following command
@@ -121,7 +121,7 @@ If the merge should be pushed to the base repo right after the merge, the follow
 ci-tools merge pr --push https://github.com/john/ci-tools-test/pull/8
 ```
 
-#####2. Merging a pull request locally on to a branch other than the base branch of the pull request.
+##### 2. Merging a pull request locally on to a branch other than the base branch of the pull request.
 
 ```
 ci-tools merge pr -b new-branch  https://github.com/john/ci-tools-test/pull/8
@@ -129,7 +129,7 @@ ci-tools merge pr -b new-branch  https://github.com/john/ci-tools-test/pull/8
 
 **NOTE** : If the target branch doesn't exist in the origin, **--no-update** switch should be used. This switch tells ci-tools not to pull the target branch from the origin.
 
-#####3. Merging a pull request on to a local repo which is not a clone of the pull request base. e.g. a fork of the base
+##### 3. Merging a pull request on to a local repo which is not a clone of the pull request base. e.g. a fork of the base
 
 ```
 ci-tools merge pr --no-strict-mode https://github.com/john/ci-tools-test/pull/8
