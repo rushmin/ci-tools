@@ -1,6 +1,6 @@
 # ci-tools
 
-####What is 'ci-tools'?
+#### What is 'ci-tools'?
 Some CI utils for Git and Maven. Only supports merging GitHub pull requests as of now.
 
 ####Requirements
